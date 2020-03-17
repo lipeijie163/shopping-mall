@@ -3,17 +3,18 @@
     <nav-bar class="home-nav">
       <div slot="center">购物街</div>
     </nav-bar>
-
+    <tab-control v-show="isTabFixed" :titles="['流行','新款','精选']" @tabClick="tabClick" ref="tabControl1"
+                 class="tab-control1"></tab-control>
     <scroll class="content" ref="scroll"
             :probe-type="3"
             @scroll="contentScroll"
             :pull-up-load="true"
             @pullingUp="loadMore">
-      <home-swiper :banners="banners"></home-swiper>
-      <home-recommend :recommends="recommends"></home-recommend>
+      <home-swiper :banners="banners" @imageLoad="imageLoad"/>
+      <home-recommend :recommends="recommends"/>
       <feature-view/>
-      <tab-control class="tab-control" :titles="['流行','新款','精选']" @tabClick="tabClick"></tab-control>
-      <goods-list :goods="showGoods"></goods-list>
+      <tab-control :titles="['流行','新款','精选']" @tabClick="tabClick" ref="tabControl2"/>
+      <goods-list :goods="showGoods"/>
     </scroll>
 
     <back-top @click.native="backClick" v-show="isShowBackTop"/>
@@ -31,6 +32,7 @@
   import BackTop from "components/content/backTop/BackTop";
 
   import {getHomeMultiData, getHomeGoods} from "network/home";
+  import {itemListenerMixin} from "common/mixin";
 
   export default {
     name: "Home",
@@ -44,6 +46,7 @@
       GoodsList,
       BackTop
     },
+    mixins: [itemListenerMixin],
     data() {
       return {
         banners: [],
@@ -54,7 +57,10 @@
           'sell': {page: 0, list: []},
         },
         currentType: 'pop',
-        isShowBackTop: false
+        isShowBackTop: false,
+        tabOffsetTop: 0,
+        saveY: 0,
+        isTabFixed: false
       }
     },
     created() {
@@ -66,9 +72,20 @@
       this.getHomeGoods('new')
       this.getHomeGoods('sell')
     },
+    mounted() {
+
+    },
+    activated() {
+      this.$refs.scroll.scroll.refresh()
+      this.$refs.scroll.scroll.scrollTo(0, this.saveY, 0)
+    },
+    deactivated() {
+      this.saveY = this.$refs.scroll.scroll.y;
+    },
     computed: {
       showGoods() {
         return this.goods[this.currentType].list
+        this.$bus.off('imageLoad', this.itemImageListener)
       }
     },
     methods: {
@@ -84,6 +101,9 @@
             this.currentType = 'sell'
             break
         }
+
+        this.$refs.tabControl1.currentIndex = index;
+        this.$refs.tabControl2.currentIndex = index;
       },
 
       backClick() {
@@ -92,11 +112,16 @@
 
       contentScroll(position) {
         this.isShowBackTop = -(position.y) > 1000;
+        this.isTabFixed = -position.y > this.tabOffsetTop
       },
 
       loadMore() {
         this.getHomeGoods(this.currentType);
         this.$refs.scroll.finishPullUp();
+      },
+
+      imageLoad() {
+        this.tabOffsetTop = this.$refs.tabControl2.$el.offsetTop
       },
 
       /**
@@ -114,7 +139,6 @@
         getHomeGoods(type, page).then(res => {
           this.goods[type].list.push(...res.data.list)
           this.goods[type].page += 1
-
         })
       }
     }
@@ -131,18 +155,7 @@
   .home-nav {
     background-color: var(--color-tint);
     color: #fff;
-
-    position: fixed;
-    left: 0;
-    right: 0;
-    top: 0;
-    z-index: 9;
-  }
-
-  .tab-control {
-    position: sticky;
-    top: 44px;
-    z-index: 9;
+    box-shadow: 0 2px 1px rgba(100, 100, 100, .05);
   }
 
   .content {
@@ -151,8 +164,15 @@
     position: absolute;
     top: 44px;
     bottom: 49px;
+  }
+
+  .tab-control1 {
+    position: fixed;
+    top: 44px;
     left: 0;
     right: 0;
+    z-index: 9;
   }
+
 
 </style>
